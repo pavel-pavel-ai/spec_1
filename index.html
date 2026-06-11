@@ -196,10 +196,29 @@
   <button class="reset" id="reset">скинути все</button>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+/* ============================================================
+   1) ВСТАВ СЮДИ КОНФІГ FIREBASE
+   Firebase console → Project settings (шестерня) → розділ "Your apps"
+   → Web app (</>) → скопіюй об'єкт firebaseConfig і заміни значення нижче.
+   ОБОВ'ЯЗКОВО має бути databaseURL (інакше база не підключиться).
+   ============================================================ */
+const firebaseConfig = {
+  apiKey:            "AIzaSyByla41MzZifUzOKcWq9IGTjnYdetHvQg8",
+  authDomain:        "spec-1-c416a.firebaseapp.com",
+  databaseURL:       "https://spec-1-c416a-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "spec-1-c416a",
+  storageBucket:     "spec-1-c416a.firebasestorage.app",
+  messagingSenderId: "895546116136",
+  appId:             "1:895546116136:web:fd3ab1b9beb835bcb40d1d"
+};
+/* ============================================================ */
+
 const TASKS = ["Докрутити ідею","Сценарій","Раскадровка 9:16","Промти","Згенерувати кадри","Монтаж","BTS / розбір","Написати пост","Опублікувати + тег"];
 const WHO = ["—","Паша","Любомир","Разом"];
-
 const CONCEPTS = [
   { id:"frodo", title:"Нова Пошта × Володар перснів", mix:"Фродо · поштомат у Мордорі",
     handle:"@novaposhta.official", handleNote:"IG + Threads",
@@ -223,13 +242,13 @@ const CONCEPTS = [
     caption:"Коли на співбесіду приходять Танос, Шрек і Джек Горобець 😅\nWork.ua знайде роботу під будь-які навички. Концепт на ШІ.\n\n#workua #співбесіда #гумор #ші" },
 ];
 
-const KEY="spec_board_v1";
-const store = (typeof window!=="undefined" && window.storage) ? window.storage : null;
-let state = {};
-let openState = new Set([CONCEPTS[0].id]);
-const board = document.getElementById("board");
-let saveTimer=null, flashTimer=null;
+let state={}, openState=new Set([CONCEPTS[0].id]), saveTimer=null, flashTimer=null;
+let editing=false, remotePending=null;
+let db=null, boardRef=null;
+let noFB = !firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf("ВСТАВ")>-1;
+if(!noFB){ try{ const app=initializeApp(firebaseConfig); db=getDatabase(app); boardRef=ref(db,"board"); }catch(e){ noFB=true; } }
 
+const board=document.getElementById("board");
 const escText = s => (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const escAttr = s => escText(s).replace(/"/g,"&quot;");
 
@@ -253,31 +272,20 @@ function ensure(){
     });
   });
 }
-
-async function load(){
-  if(!store){ state=blankState(); return; }
-  try{
-    const r = await store.get(KEY, true);
-    state = (r && r.value) ? JSON.parse(r.value) : blankState();
-  }catch(e){ state = blankState(); }
-  ensure();
-}
-async function writeNow(){
-  clearTimeout(saveTimer);
-  if(!store){ flash("локально (сховище недоступне)"); return; }
-  try{ await store.set(KEY, JSON.stringify(state), true); flash("збережено ✓"); }
-  catch(e){ flash("не вдалося зберегти"); }
-}
-function saveNow(){ flash("зберігаю…"); writeNow(); }              // discrete actions — write instantly
-function saveSoon(){ flash("зберігаю…"); if(!store) return;        // typing — short debounce
-  clearTimeout(saveTimer); saveTimer=setTimeout(writeNow,600); }
-function flash(t){
-  const el=document.getElementById("status"); el.textContent=t; el.style.opacity=1;
-  clearTimeout(flashTimer); flashTimer=setTimeout(()=>{el.textContent="зберігається автоматично";},1600);
-}
 function doneCount(id){ return TASKS.reduce((n,_,i)=> n + (state[id][i].done?1:0),0); }
 function autosize(el){ el.style.height="auto"; el.style.height=(el.scrollHeight+2)+"px"; }
 function autosizeAll(){ board.querySelectorAll(".cap,.tnote").forEach(autosize); }
+
+function flash(t){
+  const el=document.getElementById("status"); if(!el) return; el.textContent=t; el.style.opacity=1;
+  clearTimeout(flashTimer); flashTimer=setTimeout(()=>{el.textContent="зберігається автоматично";},1600);
+}
+function persist(){
+  if(noFB){ flash("додай конфіг Firebase ↑"); return; }
+  set(boardRef, state).then(()=>flash("збережено ✓")).catch(()=>flash("помилка збереження — перевір правила бази"));
+}
+function saveNow(){ flash("зберігаю…"); persist(); }
+function saveSoon(){ flash("зберігаю…"); clearTimeout(saveTimer); saveTimer=setTimeout(persist,600); }
 
 function render(){
   board.innerHTML="";
@@ -376,10 +384,32 @@ function copy(text,btn){
 function fb(text,cb){ const t=document.createElement("textarea"); t.value=text; document.body.appendChild(t); t.select();
   try{document.execCommand("copy")}catch(e){} t.remove(); cb&&cb(); }
 
-document.getElementById("reset").addEventListener("click",()=>{
-  if(confirm("Скинути весь прогрес і всі тексти для обох?")){ state=blankState(); openState=new Set([CONCEPTS[0].id]); saveNow(); render(); }
-});
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") writeNow(); });
+document.addEventListener("focusin",e=>{ if(e.target.matches("input,textarea")) editing=true; });
+document.addEventListener("focusout",e=>{ if(e.target.matches("input,textarea")){ editing=false;
+  if(remotePending){ state=remotePending; remotePending=null; ensure(); render(); } } });
 
-(async()=>{ await load(); render(); })();
+document.getElementById("reset").addEventListener("click",()=>{
+  if(confirm("Скинути весь прогрес і всі тексти для всіх?")){ state=blankState(); openState=new Set([CONCEPTS[0].id]); persist(); render(); }
+});
+
+function showWarn(){
+  if(document.getElementById("fbWarn")) return;
+  const d=document.createElement("div");
+  d.id="fbWarn";
+  d.style.cssText="background:#3a2410;border:1px solid #7a531f;color:#f4c469;border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12.5px;line-height:1.5;font-family:var(--mono)";
+  d.innerHTML="⚠ База Firebase ще не підключена — зміни поки не зберігаються. Встав конфіг у файл index.html (блок вгорі скрипта), закоміть і онови сторінку.";
+  document.body.insertBefore(d, document.body.firstChild);
+}
+
+if(noFB){
+  showWarn();
+  state=blankState(); ensure(); render();
+}else{
+  onValue(boardRef, snap=>{
+    const val=snap.val();
+    if(!val){ state=blankState(); ensure(); render(); persist(); return; }
+    if(editing){ remotePending=val; return; }
+    state=val; ensure(); render();
+  }, err=>{ state=blankState(); ensure(); render(); flash("немає доступу до бази — перевір Rules"); });
+}
 </script>
