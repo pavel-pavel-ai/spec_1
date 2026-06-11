@@ -1,0 +1,385 @@
+<!--
+  Спецролики · Продакшен-борд
+  Інтерактивний трекер для 2 людей (Паша / Любомир).
+  Прогрес + редаговані тексти зберігаються у спільному сховищі (shared).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#131419; --bg2:#0E0F13; --surface:#1B1D26; --surface2:#232634;
+    --line:#2C2F3D; --line2:#3A3E50;
+    --text:#ECEDF2; --muted:#8C8FA3; --faint:#5A5D6E;
+    --amber:#F4B740; --amber-dim:#6F551F;
+    --go:#5FD08A;
+    --pasha:#5BB8EC; --lubo:#CB8BE0; --razom:#F4B740;
+    --disp:'Unbounded', 'Inter', system-ui, sans-serif;
+    --body:'Inter', system-ui, sans-serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);
+    -webkit-font-smoothing:antialiased;line-height:1.45}
+  body{padding:18px 14px 60px;max-width:680px;margin:0 auto}
+  a{color:var(--amber)}
+
+  /* ---------- header ---------- */
+  .top{display:flex;gap:13px;align-items:flex-start;margin-bottom:6px}
+  .slate{flex:none;width:46px;height:46px;border-radius:9px;background:var(--surface2);
+    border:1px solid var(--line2);display:grid;place-items:center;position:relative;overflow:hidden}
+  .slate svg{width:30px;height:30px}
+  h1{font-family:var(--disp);font-weight:800;font-size:21px;line-height:1.05;margin:2px 0 3px;
+    letter-spacing:-.01em}
+  .sub{font-size:12.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.02em}
+
+  .overall{margin:16px 0 8px}
+  .ov-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  .ov-meta .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted);
+    text-transform:uppercase}
+  .ov-meta .pct{font-family:var(--disp);font-weight:700;font-size:17px;color:var(--amber)}
+  .strip{position:relative;height:26px;border-radius:4px;background:var(--bg2);
+    border:1px solid var(--line);overflow:hidden}
+  .strip::before,.strip::after{content:"";position:absolute;left:0;right:0;height:5px;
+    background-image:radial-gradient(circle at 4px 50%, #000 1.4px, transparent 1.6px);
+    background-size:9px 5px;opacity:.55}
+  .strip::before{top:0}.strip::after{bottom:0}
+  .strip-fill{position:absolute;top:5px;bottom:5px;left:0;width:0;
+    background:linear-gradient(90deg,#C9952B,var(--amber));transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+  .legend{display:flex;gap:14px;margin:11px 0 22px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+  /* ---------- concept card ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:13px;
+    margin-bottom:12px;overflow:hidden;transition:border-color .2s}
+  .card.open{border-color:var(--line2)}
+  .chead{display:flex;align-items:center;gap:12px;padding:14px 15px;cursor:pointer;
+    user-select:none;width:100%;background:none;border:0;color:inherit;text-align:left;font:inherit}
+  .chead:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+  .num{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--faint);flex:none;width:22px}
+  .ctitle{flex:1;min-width:0}
+  .ctitle .nm{font-family:var(--disp);font-weight:600;font-size:14.5px;line-height:1.2;display:block;margin-bottom:2px}
+  .ctitle .mx{font-size:11.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.01em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{flex:none;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--amber);
+    background:rgba(244,183,64,.1);border:1px solid var(--amber-dim);border-radius:20px;
+    padding:3px 9px;min-width:46px;text-align:center}
+  .badge.done{color:var(--go);background:rgba(95,208,138,.1);border-color:rgba(95,208,138,.35)}
+  .chev{flex:none;color:var(--faint);transition:transform .25s;font-size:13px}
+  .card.open .chev{transform:rotate(90deg)}
+
+  .mini{display:flex;gap:2px;padding:0 15px 13px;margin-top:-4px}
+  .cell{flex:1;height:6px;border-radius:1.5px;background:var(--surface2);transition:background .25s}
+  .cell.on{background:var(--amber)}
+
+  .cbody{display:none;padding:4px 15px 16px;border-top:1px solid var(--line)}
+  .card.open .cbody{display:block}
+  .logline{font-size:13px;color:var(--muted);margin:13px 0 15px;line-height:1.5}
+  .logline b{color:var(--text);font-weight:600}
+
+  /* ---------- task (editable) ---------- */
+  .task{display:flex;flex-direction:column;padding:9px 0;border-bottom:1px solid #20222D}
+  .task:last-of-type{border-bottom:0}
+  .task-top{display:flex;align-items:center;gap:11px}
+  .tick{flex:none;width:21px;height:21px;border-radius:6px;border:1.6px solid var(--line2);
+    background:var(--bg2);display:grid;place-items:center;cursor:pointer;transition:.18s}
+  .tick:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .tick svg{width:12px;height:12px;opacity:0;transform:scale(.4);transition:.18s;color:#1a1300}
+  .task.checked .tick{background:var(--amber);border-color:var(--amber)}
+  .task.checked .tick svg{opacity:1;transform:scale(1)}
+
+  .tlabel{flex:1;min-width:0;font-size:13.5px;color:var(--text);background:none;border:0;
+    font-family:var(--body);padding:3px 5px;border-radius:5px}
+  .tlabel:focus{outline:none;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line2)}
+  .task.checked .tlabel{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+
+  .who{flex:none;font-family:var(--mono);font-size:11.5px;font-weight:500;border-radius:7px;
+    padding:5px 8px;background:var(--surface2);border:1px solid var(--line2);color:var(--muted);
+    cursor:pointer;appearance:none;-webkit-appearance:none}
+  .who:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  .who[data-who="Паша"]{color:var(--pasha);border-color:var(--pasha)}
+  .who[data-who="Любомир"]{color:var(--lubo);border-color:var(--lubo)}
+  .who[data-who="Разом"]{color:var(--razom);border-color:var(--razom)}
+
+  .tnote{width:calc(100% - 32px);margin:3px 0 0 32px;background:none;border:0;resize:none;
+    color:var(--muted);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:3px 5px;
+    border-radius:5px;overflow:hidden;display:block}
+  .tnote::placeholder{color:var(--faint);font-style:italic}
+  .tnote:focus{outline:none;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line2);color:var(--text)}
+
+  /* tag + caption */
+  .meta{margin-top:15px}
+  .row{display:flex;align-items:flex-start;gap:9px;margin-top:10px}
+  .key{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--faint);flex:none;width:64px;padding-top:6px}
+  .tag{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:700;padding-top:4px}
+  .tag.tbd{color:var(--muted);font-weight:500}
+  .cap{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--line);border-radius:9px;
+    padding:10px 11px;font-size:12.5px;color:#D2D4DE;line-height:1.55;font-family:var(--body);
+    resize:none;overflow:hidden;width:100%}
+  .cap:focus{outline:none;border-color:var(--amber-dim);color:var(--text)}
+  .copy{flex:none;border:1px solid var(--line2);background:var(--surface2);color:var(--muted);
+    border-radius:7px;padding:5px 9px;font-family:var(--mono);font-size:10.5px;cursor:pointer;
+    letter-spacing:.05em;transition:.15s;align-self:flex-start;margin-top:2px}
+  .copy:hover{color:var(--text);border-color:var(--text)}
+  .copy.ok{color:var(--go);border-color:var(--go)}
+
+  /* footer notes */
+  .notes{margin-top:30px;border-top:1px solid var(--line);padding-top:20px}
+  .notes h2{font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:.02em;margin:0 0 4px}
+  .notes .hint{font-size:12px;color:var(--faint);margin:0 0 16px}
+  .note{display:flex;gap:11px;font-size:13px;color:#BFC2CF;margin-bottom:13px;line-height:1.5}
+  .note .ic{flex:none;width:24px;height:24px;border-radius:7px;background:var(--surface2);
+    border:1px solid var(--line2);display:grid;place-items:center;color:var(--amber);
+    font-family:var(--mono);font-size:12px;font-weight:700}
+  .note b{color:var(--text);font-weight:600}
+
+  .foot{margin-top:26px;display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.04em}
+  .reset{background:none;border:1px solid var(--line);color:var(--faint);border-radius:7px;
+    padding:5px 10px;font-family:var(--mono);font-size:10.5px;cursor:pointer;letter-spacing:.05em}
+  .reset:hover{color:var(--amber);border-color:var(--amber-dim)}
+  #status{transition:opacity .4s}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  @media (max-width:430px){
+    .task-top{flex-wrap:wrap}
+    .who{margin-left:32px}
+    .ctitle .mx{white-space:normal}
+  }
+</style>
+
+<div class="top">
+  <div class="slate" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M2.5 8.5h19v11a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 19.5v-11Z" stroke="#F4B740" stroke-width="1.5"/><path d="M2.8 8.5 5 3.4l3.4 2.9L10.8 3l3.4 2.9L16.6 3 20 5.9l1.4-2.9 1 4.2-19.6 1.3Z" fill="#232634" stroke="#F4B740" stroke-width="1.3" stroke-linejoin="round"/></svg>
+  </div>
+  <div>
+    <h1>Спецролики · продакшен-борд</h1>
+    <div class="sub">studio reel · 5 концептів → стрічка</div>
+  </div>
+</div>
+
+<div class="overall">
+  <div class="ov-meta">
+    <span class="lbl">загальний прогрес</span>
+    <span class="pct" id="ovPct">0%</span>
+  </div>
+  <div class="strip"><div class="strip-fill" id="ovFill"></div></div>
+</div>
+
+<div class="legend">
+  <span><i class="dot" style="background:var(--pasha)"></i>Паша</span>
+  <span><i class="dot" style="background:var(--lubo)"></i>Любомир</span>
+  <span><i class="dot" style="background:var(--razom)"></i>Разом</span>
+  <span><i class="dot" style="background:var(--faint)"></i>не призначено</span>
+</div>
+
+<div id="board"></div>
+
+<div class="notes">
+  <h2>Що ще додати, щоб процес їхав</h2>
+  <p class="hint">Поради поза чеклістом — щоб серія працювала як кампанія, а не як 5 випадкових роликів.</p>
+  <div class="note"><span class="ic">↺</span><div><b>BTS до кожного ролика.</b> «Як ми це зробили» / розбір процесу — саме це шерять маркетологи й це доводить, що ви режисери, а не промпт-оператори. Тому він уже окремим пунктом у кожному концепті.</div></div>
+  <div class="note"><span class="ic">▦</span><div><b>Крос-постинг.</b> Кожен ролик → Reels + Threads + TikTok, розбір → ще й LinkedIn (під агенції та B2B). Один концепт = 4 точки охоплення.</div></div>
+  <div class="note"><span class="ic">⏱</span><div><b>Графік виходу.</b> Не вивалюйте все за день. По 1 ролику кожні 3–4 дні — серія тримає увагу й виглядає як кампанія.</div></div>
+  <div class="note"><span class="ic">✉</span><div><b>Тепла база.</b> Після публікації — адресно киньте релевантний ролик знайомим агенціям. Холодний кейс у стрічці + теплий лист = заявка.</div></div>
+  <div class="note"><span class="ic">⚑</span><div><b>Черепашки:</b> ще не прибитий бренд. Обрати піцерію (гег «така смачна, що краде навіть сенсей») або агрегатор доставки (гег «швидше за ніндзя») — і вписати хендл у картку.</div></div>
+</div>
+
+<div class="foot">
+  <span id="status">зберігається автоматично</span>
+  <button class="reset" id="reset">скинути все</button>
+</div>
+
+<script>
+const TASKS = ["Докрутити ідею","Сценарій","Раскадровка 9:16","Промти","Згенерувати кадри","Монтаж","BTS / розбір","Написати пост","Опублікувати + тег"];
+const WHO = ["—","Паша","Любомир","Разом"];
+
+const CONCEPTS = [
+  { id:"frodo", title:"Нова Пошта × Володар перснів", mix:"Фродо · поштомат у Мордорі",
+    handle:"@novaposhta.official", handleNote:"IG + Threads",
+    logline:"Фродо приходить налегке до жерла вулкана, поряд поштомат, дістає перстень за кодом — і кидає в лаву. <b>Тег: «Навіщо так складно?»</b>",
+    caption:"Саурон витратив три фільми на доставку каблучки 💍 Фродо — один поштомат 📦\nКонцепт-реклама, яку ми зібрали на ШІ.\n\n#новапошта #володарперснів #ші #реклама #motion" },
+  { id:"uklon", title:"Uklon × Форсаж", mix:"Торетто за кермом",
+    handle:"@uklon.ua", handleNote:"IG",
+    logline:"Лисий Торетто везе пасажира з пафосом «Форсажа»… 200 метрів до сусіднього дому. Платіж Uklon списується сам. <b>Тег: «Доїдемо як сім'я.»</b>",
+    caption:"«Це не просто поїздка. Це — сім'я.» 🏎️ Торетто пересів на Uklon.\nНаш концепт-ролик на ШІ.\n\n#uklon #форсаж #таксі #ші" },
+  { id:"mono", title:"Монобанк × Хрещений батько", mix:"Монокіт у кріслі Дона",
+    handle:"@monobank.ua", handleNote:"маскот = Монокіт 🐱",
+    logline:"У кріслі Дона — величезний Монокіт, у лапках гладить болванчик-Віто (трясеться голова). Тапом лапою миттєво одобрює ліміт. <b>Тег: «Пропозиція, від якої не відмовляються.»</b>",
+    caption:"Пропозиція, від якої не відмовляються 🐱 У кріслі Дона — Монокіт.\nКонцепт на ШІ.\n\n#monobank #монокіт #хрещенийбатько #ші #реклама" },
+  { id:"turtles", title:"Доставка × Черепашки-ніндзя", mix:"бренд — обрати ⚑",
+    handle:"обрати бренд", handleTbd:true, handleNote:"піцерія або агрегатор",
+    logline:"Черепашки замовляють піцу, вона приїздить швидше, ніж вони дістають зброю. Відкривають коробку — шматка немає. Монтаж: Сплінтер (щур!) дожовує. <b>Спершу прибити бренд.</b>",
+    caption:"Останній шматок піци вкрав… учитель Сплінтер 🐢🍕 Класика.\nКонцепт-реклама на ШІ.\n\n#піца #доставка #черепашкиніндзя #ші" },
+  { id:"workua", title:"Work.ua × співбесіда", mix:"jump-cut героїв фільмів",
+    handle:"@work.ua", handleNote:"IG",
+    logline:"HR-ка гортає jump-cut'ами Таноса, Шрека, Джека Горобця — і кожному знаходить роботу під дикі скіли. <b>Тег: «Знайдемо роботу під найдикіші навички.»</b>",
+    caption:"Коли на співбесіду приходять Танос, Шрек і Джек Горобець 😅\nWork.ua знайде роботу під будь-які навички. Концепт на ШІ.\n\n#workua #співбесіда #гумор #ші" },
+];
+
+const KEY="spec_board_v1";
+const store = (typeof window!=="undefined" && window.storage) ? window.storage : null;
+let state = {};
+let openState = new Set([CONCEPTS[0].id]);
+const board = document.getElementById("board");
+let saveTimer=null, flashTimer=null;
+
+const escText = s => (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const escAttr = s => escText(s).replace(/"/g,"&quot;");
+
+function blankTask(i){ return {done:false, who:"—", label:TASKS[i], note:""}; }
+function blankState(){
+  const s={};
+  CONCEPTS.forEach(c=>{ s[c.id]={caption:c.caption}; TASKS.forEach((_,i)=>{ s[c.id][i]=blankTask(i); }); });
+  return s;
+}
+function ensure(){
+  CONCEPTS.forEach(c=>{
+    if(!state[c.id]) state[c.id]={};
+    if(state[c.id].caption==null) state[c.id].caption=c.caption;
+    TASKS.forEach((_,i)=>{
+      const t=state[c.id][i];
+      if(!t){ state[c.id][i]=blankTask(i); return; }
+      if(t.label==null) t.label=TASKS[i];
+      if(t.note==null) t.note="";
+      if(t.who==null) t.who="—";
+      if(t.done==null) t.done=false;
+    });
+  });
+}
+
+async function load(){
+  if(!store){ state=blankState(); return; }
+  try{
+    const r = await store.get(KEY, true);
+    state = (r && r.value) ? JSON.parse(r.value) : blankState();
+  }catch(e){ state = blankState(); }
+  ensure();
+}
+async function writeNow(){
+  clearTimeout(saveTimer);
+  if(!store){ flash("локально (сховище недоступне)"); return; }
+  try{ await store.set(KEY, JSON.stringify(state), true); flash("збережено ✓"); }
+  catch(e){ flash("не вдалося зберегти"); }
+}
+function saveNow(){ flash("зберігаю…"); writeNow(); }              // discrete actions — write instantly
+function saveSoon(){ flash("зберігаю…"); if(!store) return;        // typing — short debounce
+  clearTimeout(saveTimer); saveTimer=setTimeout(writeNow,600); }
+function flash(t){
+  const el=document.getElementById("status"); el.textContent=t; el.style.opacity=1;
+  clearTimeout(flashTimer); flashTimer=setTimeout(()=>{el.textContent="зберігається автоматично";},1600);
+}
+function doneCount(id){ return TASKS.reduce((n,_,i)=> n + (state[id][i].done?1:0),0); }
+function autosize(el){ el.style.height="auto"; el.style.height=(el.scrollHeight+2)+"px"; }
+function autosizeAll(){ board.querySelectorAll(".cap,.tnote").forEach(autosize); }
+
+function render(){
+  board.innerHTML="";
+  CONCEPTS.forEach((c,idx)=>{
+    const dc=doneCount(c.id), full=dc===TASKS.length, isOpen=openState.has(c.id);
+    const card=document.createElement("div");
+    card.className="card"+(isOpen?" open":"");
+    card.innerHTML=`
+      <button class="chead" aria-expanded="${isOpen}">
+        <span class="num">${String(idx+1).padStart(2,"0")}</span>
+        <span class="ctitle"><span class="nm">${c.title}</span><span class="mx">${c.mix}</span></span>
+        <span class="badge ${full?"done":""}">${dc}/${TASKS.length}</span>
+        <span class="chev">▶</span>
+      </button>
+      <div class="mini">${TASKS.map((_,i)=>`<span class="cell ${state[c.id][i].done?"on":""}"></span>`).join("")}</div>
+      <div class="cbody">
+        <p class="logline">${c.logline}</p>
+        <div class="tasks">${TASKS.map((t,i)=>{
+          const st=state[c.id][i];
+          return `<div class="task ${st.done?"checked":""}">
+            <div class="task-top">
+              <button class="tick" role="checkbox" aria-checked="${st.done}" aria-label="Виконано">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5 10 17 19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <input class="tlabel" value="${escAttr(st.label)}" aria-label="Назва пункту" spellcheck="false">
+              <select class="who" data-who="${st.who!=="—"?st.who:""}" aria-label="Відповідальний">
+                ${WHO.map(w=>`<option ${w===st.who?"selected":""}>${w}</option>`).join("")}
+              </select>
+            </div>
+            <textarea class="tnote" rows="1" placeholder="коментар…" aria-label="Коментар">${escText(st.note)}</textarea>
+          </div>`;
+        }).join("")}</div>
+        <div class="meta">
+          <div class="row">
+            <span class="key">тегнути</span>
+            <span class="tag ${c.handleTbd?"tbd":""}">${c.handle}</span>
+            <span style="font-size:11px;color:var(--faint);font-family:var(--mono);padding-top:5px">${c.handleNote||""}</span>
+          </div>
+          <div class="row">
+            <span class="key">пост</span>
+            <textarea class="cap" aria-label="Текст поста" spellcheck="false">${escText(state[c.id].caption)}</textarea>
+            <button class="copy">копі</button>
+          </div>
+        </div>
+      </div>`;
+    board.appendChild(card);
+
+    const head=card.querySelector(".chead");
+    head.addEventListener("click",()=>{
+      if(openState.has(c.id)) openState.delete(c.id); else openState.add(c.id);
+      const open=openState.has(c.id);
+      card.classList.toggle("open",open);
+      head.setAttribute("aria-expanded",open);
+      if(open) autosizeAll();
+    });
+
+    card.querySelectorAll(".task").forEach((row,i)=>{
+      row.querySelector(".tick").addEventListener("click",()=>{
+        state[c.id][i].done=!state[c.id][i].done; saveNow(); render();
+      });
+      const lbl=row.querySelector(".tlabel");
+      lbl.addEventListener("input",()=>{ state[c.id][i].label=lbl.value; saveSoon(); });
+      lbl.addEventListener("blur",saveNow);
+      const sel=row.querySelector(".who");
+      sel.addEventListener("change",()=>{ state[c.id][i].who=sel.value; sel.dataset.who=sel.value!=="—"?sel.value:""; saveNow(); });
+      const nt=row.querySelector(".tnote");
+      nt.addEventListener("input",()=>{ state[c.id][i].note=nt.value; autosize(nt); saveSoon(); });
+      nt.addEventListener("blur",saveNow);
+    });
+
+    const cap=card.querySelector(".cap");
+    cap.addEventListener("input",()=>{ state[c.id].caption=cap.value; autosize(cap); saveSoon(); });
+    cap.addEventListener("blur",saveNow);
+    card.querySelector(".copy").addEventListener("click",e=>{
+      const txt=state[c.id].caption + (c.handleTbd?"":"\n"+c.handle);
+      copy(txt,e.target);
+    });
+  });
+  updateOverall();
+  autosizeAll();
+}
+
+function updateOverall(){
+  const total=CONCEPTS.length*TASKS.length;
+  let done=0; CONCEPTS.forEach(c=>done+=doneCount(c.id));
+  const pct=Math.round(done/total*100);
+  document.getElementById("ovPct").textContent=pct+"%";
+  document.getElementById("ovFill").style.width=pct+"%";
+}
+function copy(text,btn){
+  const ok=()=>{ const o=btn.textContent; btn.textContent="✓"; btn.classList.add("ok");
+    setTimeout(()=>{btn.textContent=o;btn.classList.remove("ok");},1300); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(()=>fb(text,ok)); }
+  else fb(text,ok);
+}
+function fb(text,cb){ const t=document.createElement("textarea"); t.value=text; document.body.appendChild(t); t.select();
+  try{document.execCommand("copy")}catch(e){} t.remove(); cb&&cb(); }
+
+document.getElementById("reset").addEventListener("click",()=>{
+  if(confirm("Скинути весь прогрес і всі тексти для обох?")){ state=blankState(); openState=new Set([CONCEPTS[0].id]); saveNow(); render(); }
+});
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") writeNow(); });
+
+(async()=>{ await load(); render(); })();
+</script>
